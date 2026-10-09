@@ -1,0 +1,981 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Nirvana Natura Farms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen&family=Young+Serif&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-screen CRT game gate (canvas, low-res) -> modern single-column farm site with three views (Farm, Experience, Shop), each built around a top-down line map or a pixel inventory screen. */
+:root{
+  --milk:#ECEDE4;      /* milky phosphor white */
+  --milk-2:#E1E3D7;
+  --milk-3:#F6F7F1;
+  --ink:#263022;       /* deep olive line ink */
+  --ink-soft:#5B6553;
+  --honey:#D9961A;
+  --honey-deep:#94600C;
+  --leaf:#4F7A3B;
+  --stamp:#B5483B;     /* sold-out stamp */
+  --font-pixel:"Press Start 2P", ui-monospace, "Courier New", monospace;
+  --font-label:"Silkscreen", ui-monospace, "Courier New", monospace;
+  --font-display:"Young Serif", Georgia, "Times New Roman", serif;
+  --font-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--milk);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+html.in-game, html.in-game body{overflow:hidden}
+
+/* ---------- GAME ---------- */
+#game{position:fixed;inset:0;z-index:20;background:var(--milk);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block;filter:contrast(1.04) saturate(1.05)}
+.crt{position:absolute;inset:0;pointer-events:none;z-index:5}
+.crt::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(to bottom, rgba(38,48,34,.075) 0 1px, transparent 1px 3px);
+  mix-blend-mode:multiply;animation:flicker 4s steps(2) infinite}
+.crt::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(ellipse at center, rgba(255,255,255,.18) 0%, transparent 45%, rgba(38,48,34,.10) 75%, rgba(38,48,34,.34) 100%);
+  box-shadow:inset 0 0 120px rgba(38,48,34,.28)}
+@keyframes flicker{0%,100%{opacity:1}50%{opacity:.82}}
+#boot{position:absolute;inset:0;z-index:6;display:grid;place-items:center;background:var(--milk);padding-inline:16px;cursor:pointer}
+#boot .t{font-family:var(--font-pixel);color:var(--ink);text-align:center;line-height:1.7;letter-spacing:.04em;
+  font-size:clamp(18px,3.4vw,38px);text-shadow:2px 2px 0 var(--honey), 0 0 14px rgba(217,150,26,.35);text-wrap:balance}
+#boot .s{display:block;margin-top:1.4em;font-size:.36em;color:var(--ink-soft);text-shadow:none;letter-spacing:.2em}
+#boot.run .t{animation:bootIn 3.4s steps(18) forwards}
+@keyframes bootIn{0%{opacity:0;filter:blur(3px)}12%{opacity:1;filter:blur(0)}78%{opacity:1;transform:none}100%{opacity:0;transform:scaleY(.05)}}
+#hint{position:absolute;left:50%;top:max(28px,6vh);transform:translateX(-50%);z-index:4;text-align:center;
+  font-family:var(--font-pixel);font-size:clamp(10px,1.4vw,14px);color:var(--ink);line-height:1.9;
+  background:var(--milk-3);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--honey);padding:12px 16px;width:max-content;max-width:calc(100% - 32px)}
+#hint small{display:block;font-size:.7em;color:var(--ink-soft)}
+#hint.blink{animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{border-color:var(--honey)}}
+#enterBtn{position:absolute;z-index:4;background:transparent;border:0;color:transparent;cursor:pointer;font:0/0 a}
+#enterBtn:focus-visible{outline:3px dashed var(--honey-deep);outline-offset:4px}
+#skip{position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:7;font-family:var(--font-label);font-size:13px;
+  color:var(--ink-soft);background:transparent;border:2px solid var(--ink-soft);padding:6px 10px;cursor:pointer;letter-spacing:.06em}
+#sound{position:absolute;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:7;font-family:var(--font-label);font-size:13px;color:var(--ink-soft);background:transparent;border:2px solid var(--ink-soft);padding:6px 10px;cursor:pointer;letter-spacing:.06em}
+#sound[aria-pressed="true"]{color:var(--ink);border-color:var(--ink);background:var(--milk-3);box-shadow:3px 3px 0 var(--honey)}
+#sound:focus-visible{outline:3px dashed var(--honey-deep);outline-offset:2px}
+#skip:hover,#skip:focus-visible{color:var(--ink);border-color:var(--ink);background:var(--milk-3);outline:none}
+#game.off{animation:crtOff .75s cubic-bezier(.7,0,.3,1) forwards}
+@keyframes crtOff{0%{transform:none;filter:none}45%{transform:scale(1,.008);filter:brightness(2.2)}75%{transform:scale(.3,.004);filter:brightness(3)}100%{transform:scale(0,0);opacity:0}}
+
+/* ---------- SITE ---------- */
+#farm{min-height:100%;opacity:0;transition:opacity .9s ease}
+#farm.show{opacity:1}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px 28px;flex-wrap:wrap;padding-block:28px;border-bottom:2px solid var(--ink)}
+.logo{font-family:var(--font-pixel);font-size:13px;letter-spacing:.06em;line-height:1.6;color:var(--ink);text-shadow:2px 2px 0 var(--honey);background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.logo span{display:block;font-family:var(--font-label);font-size:12px;text-shadow:none;color:var(--ink-soft);letter-spacing:.1em}
+.nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nav button{font-family:var(--font-label);font-size:13px;letter-spacing:.08em;background:transparent;border:2px solid transparent;color:var(--ink);padding:7px 11px;cursor:pointer}
+.nav button:hover,.nav button:focus-visible{border-color:var(--ink);outline:none}
+.nav button[aria-current="page"]{background:var(--ink);color:var(--milk);border-color:var(--ink)}
+.btn-ghost{font-family:var(--font-label);font-size:13px;letter-spacing:.06em;background:transparent;border:2px solid var(--ink);color:var(--ink);padding:8px 12px;cursor:pointer;box-shadow:3px 3px 0 var(--honey)}
+.btn-ghost:hover,.btn-ghost:focus-visible{background:var(--ink);color:var(--milk);outline:none}
+.btn-solid{font-family:var(--font-pixel);font-size:11px;letter-spacing:.06em;line-height:1.5;background:var(--honey);border:3px solid var(--ink);color:var(--ink);padding:12px 16px;cursor:pointer;box-shadow:4px 4px 0 var(--ink)}
+.btn-solid:hover,.btn-solid:focus-visible{background:var(--ink);color:var(--milk);outline:none}
+.btn-solid:disabled{background:var(--milk-2);color:var(--ink-soft);border-color:var(--ink-soft);box-shadow:none;cursor:not-allowed}
+.lede{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px 72px;align-items:end;padding-block:88px 52px}
+.lede h1{font-family:var(--font-display);font-weight:400;font-size:clamp(34px,5.2vw,62px);line-height:1.08;margin:14px 0 0;text-wrap:balance;letter-spacing:-.01em}
+.lede h1 em{font-style:normal;color:var(--honey-deep)}
+.lede p{margin:0;color:var(--ink-soft);max-width:46ch}
+.eyebrow{font-family:var(--font-label);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--honey-deep);margin:0}
+.mapcard{position:relative;border:2px solid var(--ink);background:var(--milk-3);box-shadow:6px 6px 0 var(--milk-2)}
+.mapscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.map{display:block;width:100%;min-width:760px;height:auto}
+.axis{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:2px solid var(--ink);padding:10px 16px;font-family:var(--font-label);font-size:12px;letter-spacing:.1em;color:var(--ink-soft)}
+.axis i{flex:1;height:0;border-top:2px dashed var(--ink-soft);opacity:.5}
+.map.port{min-width:0}
+.axis-top{display:none;border-top:0;border-bottom:2px solid var(--ink);justify-content:center}
+.mapcard.port .axis-top{display:flex}
+.mapcard.port .scrollnote{display:none!important}
+.mapcard.port .axis:not(.axis-top) .a-front,.mapcard.port .axis:not(.axis-top) i,.mapcard.port .arr{display:none}
+.mapcard.port .axis:not(.axis-top){justify-content:center}
+.map.port .lbl{font-size:17px}
+.map.port .lbl-s{font-size:13px}
+.map.port .pin circle{r:16}
+.map.port .pin text{font-size:13px}
+.scrollnote{display:none;font-family:var(--font-label);font-size:11px;color:var(--ink-soft);padding:8px 16px 0;letter-spacing:.08em}
+@media (max-width:800px){.scrollnote{display:block}.lede{grid-template-columns:1fr;padding-block:52px 36px}}
+
+/* SVG map styling */
+.ink{fill:none;stroke:var(--ink);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;transition:stroke .2s}
+.thin{stroke-width:1.1}
+.soft{fill:var(--milk-3)}
+.dash{stroke-dasharray:4 5}
+.boundary{fill:none;stroke:var(--ink-soft);stroke-width:1.3;stroke-dasharray:2 7;stroke-linecap:round}
+.fruit{fill:var(--honey);stroke:none}
+.petal{fill:var(--milk-3);stroke:var(--ink);stroke-width:1}
+.pcore{fill:var(--honey);stroke:none}
+.grass{fill:none;stroke:var(--leaf);stroke-width:1.1;stroke-linecap:round;opacity:.75}
+.lbl{paint-order:stroke;stroke:var(--milk-3);stroke-width:7px;stroke-linejoin:round;font-family:var(--font-label);font-size:14px;fill:var(--ink);letter-spacing:.06em;text-anchor:middle}
+.lbl-s{paint-order:stroke;stroke:var(--milk-3);stroke-width:6px;stroke-linejoin:round;font-family:var(--font-label);font-size:10.5px;fill:var(--leaf);letter-spacing:.08em;text-anchor:middle}
+.zone{cursor:pointer;outline:none}
+.zone .hit{fill:transparent;stroke:transparent;stroke-width:2;transition:fill .2s, stroke .2s}
+.zone:hover .hit,.zone:focus-visible .hit{fill:rgba(217,150,26,.10);stroke:var(--honey);stroke-dasharray:3 6}
+.zone.active .hit{fill:rgba(217,150,26,.17);stroke:var(--honey-deep);stroke-dasharray:none}
+.zone:hover .ink,.zone:focus-visible .ink,.zone.active .ink{stroke:var(--honey-deep)}
+.zone:hover .lbl,.zone.active .lbl,.zone:focus-visible .lbl{fill:var(--honey-deep)}
+.mbee{fill:var(--honey);stroke:var(--ink);stroke-width:1.4;pointer-events:none}
+.route{fill:none;stroke:var(--honey);stroke-width:3.5;stroke-dasharray:2 9;stroke-linecap:round;pointer-events:none}
+.pin circle{fill:var(--honey);stroke:var(--ink);stroke-width:2}
+.pin text{font-family:var(--font-pixel);font-size:11px;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.pin{pointer-events:none}
+
+/* Hover tip on experience map */
+.tip{position:absolute;z-index:3;width:min(300px,calc(100% - 24px));background:var(--milk-3);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--honey);padding:12px 14px;pointer-events:none;
+  transform:translate(-50%,calc(-100% - 10px));transition:opacity .15s}
+.tip .eyebrow{font-size:11px}
+.tip b{display:block;font-family:var(--font-display);font-weight:400;font-size:19px;line-height:1.2;margin:4px 0 4px}
+.tip p{margin:0;font-size:14px;line-height:1.45;color:var(--ink-soft)}
+
+/* Info panel */
+.info{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:48px 88px;padding-block:72px 96px}
+@media (max-width:820px){.info{grid-template-columns:1fr}}
+.panel{min-width:0}
+.panel h2{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,3.6vw,42px);line-height:1.12;margin:14px 0 26px;text-wrap:balance}
+.panel p{margin:0 0 20px;max-width:62ch}
+.panel ol,.panel ul{margin:26px 0 0;padding:0;list-style:none;display:grid;gap:18px;max-width:62ch}
+.panel ol{counter-reset:s}
+.panel ol li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start}
+.panel ol li::before{content:counter(s);font-family:var(--font-pixel);font-size:11px;width:30px;height:30px;display:grid;place-items:center;border:2px solid var(--ink);background:var(--milk-3);box-shadow:2px 2px 0 var(--honey)}
+.panel ul li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px}
+.panel ul li::before{content:"";width:8px;height:8px;margin-top:9px;background:var(--honey);box-shadow:2px 2px 0 var(--ink)}
+.panel b{font-weight:600}
+.panel ol b{display:block}
+.onexp{margin-top:36px;border:2px dashed var(--ink-soft);padding:20px 22px;max-width:62ch;background:var(--milk-3)}
+.onexp p{margin:10px 0 0}
+.onexp button{margin-top:16px}
+.facts{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.facts span{font-family:var(--font-label);font-size:12px;letter-spacing:.06em;border:2px solid var(--ink);padding:6px 10px;background:var(--milk-3)}
+.panel.swap{animation:swap .4s ease}
+@keyframes swap{from{opacity:.2;transform:translateY(6px)}to{opacity:1;transform:none}}
+.stops{min-width:0;display:grid;gap:10px;align-content:start}
+.stop{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:center;text-align:left;width:100%;
+  font:inherit;color:var(--ink);background:transparent;border:2px solid transparent;border-bottom:2px solid var(--milk-2);padding:14px 12px;cursor:pointer}
+.stop .n{font-family:var(--font-pixel);font-size:10px;width:28px;height:28px;display:grid;place-items:center;border:2px solid var(--ink)}
+.stop small{display:block;color:var(--ink-soft);font-size:13px;line-height:1.35}
+.stop:hover,.stop:focus-visible{border-color:var(--ink);background:var(--milk-3);outline:none}
+.stop[aria-current="true"]{border-color:var(--ink);background:var(--milk-3);box-shadow:4px 4px 0 var(--honey)}
+.stop[aria-current="true"] .n{background:var(--honey)}
+
+/* Section heads */
+.sechead{display:flex;justify-content:space-between;align-items:end;gap:20px 40px;flex-wrap:wrap;border-top:2px solid var(--ink);padding-block:80px 44px}
+.sechead h2{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,3.8vw,44px);line-height:1.1;margin:14px 0 0;text-wrap:balance}
+.sechead p{margin:8px 0 0;color:var(--ink-soft);max-width:48ch}
+
+/* ---------- INVENTORY ---------- */
+.inv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px 72px;align-items:start;padding-bottom:104px}
+@media (max-width:820px){.inv{grid-template-columns:1fr}}
+.inv-screen{position:relative;min-width:0;background:var(--milk);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--honey);padding:18px;overflow:hidden}
+.inv-screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom, rgba(38,48,34,.07) 0 1px, transparent 1px 3px),radial-gradient(ellipse at center, transparent 55%, rgba(38,48,34,.18) 100%)}
+.inv-head{display:flex;justify-content:space-between;font-family:var(--font-pixel);font-size:10px;letter-spacing:.08em;color:var(--ink);border-bottom:3px solid var(--ink);padding-bottom:10px}
+.inv-stage{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;padding-block:22px}
+.inv-arrow{width:44px;height:44px;font-family:var(--font-pixel);font-size:14px;background:var(--milk-3);border:3px solid var(--ink);color:var(--ink);cursor:pointer;box-shadow:3px 3px 0 var(--ink);display:grid;place-items:center;padding:0}
+.inv-arrow:hover,.inv-arrow:focus-visible{background:var(--honey);outline:none}
+.inv-arrow:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.inv-art{display:block;width:100%;max-width:260px;aspect-ratio:1;margin:0 auto;image-rendering:pixelated;animation:float 2.6s steps(6) infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.inv-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:3px solid var(--ink);padding-top:12px}
+.slot{position:relative;aspect-ratio:1;max-width:100%;background:var(--milk-3);border:3px solid var(--ink-soft);cursor:pointer;padding:6px;display:grid;place-items:center}
+.slot canvas{width:70%;height:70%;image-rendering:pixelated}
+.slot:hover,.slot:focus-visible{border-color:var(--ink);outline:none}
+.slot[aria-pressed="true"]{border-color:var(--ink);background:#FBF3DE;box-shadow:inset 0 0 0 3px var(--honey)}
+.slot .x{position:absolute;right:4px;bottom:3px;font-family:var(--font-pixel);font-size:8px;color:var(--stamp)}
+.inv-info{min-width:0}
+.inv-info h3{font-family:var(--font-display);font-weight:400;font-size:clamp(26px,3vw,36px);line-height:1.12;margin:14px 0 10px}
+.price{font-family:var(--font-pixel);font-size:16px;letter-spacing:.04em;margin:8px 0 20px}
+.price small{font-family:var(--font-label);font-size:12px;color:var(--ink-soft);letter-spacing:.08em;margin-left:6px}
+.quip{margin:6px 0 28px;padding:18px 20px;background:var(--milk-3);border-left:6px solid var(--honey);font-family:var(--font-label);font-size:14px;line-height:1.6;letter-spacing:.02em;max-width:52ch}
+.stats{display:grid;gap:12px;margin:0 0 28px;padding:0;list-style:none;max-width:360px}
+.stats li{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:10px;font-family:var(--font-label);font-size:12px;letter-spacing:.08em}
+.bar{display:flex;gap:3px}
+.bar i{width:16px;height:12px;border:2px solid var(--ink);background:var(--milk-3)}
+.bar i.on{background:var(--honey)}
+.tiers{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px}
+.tier{font-family:var(--font-label);font-size:13px;letter-spacing:.06em;padding:10px 14px;border:2px solid var(--ink);background:var(--milk-3);color:var(--ink);cursor:pointer;text-align:left}
+.tier b{display:block;font-family:var(--font-pixel);font-size:12px;margin-top:4px;font-weight:400}
+.tier[aria-pressed="true"]{background:var(--ink);color:var(--milk)}
+.tier:focus-visible{outline:3px dashed var(--honey-deep);outline-offset:2px}
+.status{display:inline-block;font-family:var(--font-pixel);font-size:10px;letter-spacing:.08em;padding:6px 8px;border:2px solid currentColor;margin-bottom:20px}
+.status.out{color:var(--stamp);transform:rotate(-2deg)}
+.status.in{color:var(--leaf)}
+.buyrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.note{font-size:14px;color:var(--ink-soft);margin:16px 0 0;min-height:1.4em}
+.details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:36px 48px;padding-block:16px 104px}
+@media (max-width:820px){.details{grid-template-columns:1fr}}
+.details div{border-top:2px solid var(--ink);padding-top:20px;min-width:0}
+.details h3{font-family:var(--font-label);font-size:13px;letter-spacing:.1em;margin:0 0 12px;font-weight:400}
+.details p{margin:0;color:var(--ink-soft);font-size:15px}
+.details a{color:var(--honey-deep)}
+
+footer{border-top:2px solid var(--ink);padding-block:32px 48px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-label);font-size:12px;letter-spacing:.08em;color:var(--ink-soft)}
+footer a{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){
+  .crt::before,#hint.blink,.inv-art{animation:none}
+  #farm{transition:none}
+  .panel.swap{animation:none}
+}
+</style>
+
+<div id="game" aria-label="Entry game: guide the queen bee to the hive">
+  <canvas id="cv"></canvas>
+  <div id="boot" class="run" role="button" tabindex="0" aria-label="Skip title">
+    <div class="t">NIRVANA<br>NATURA FARMS<span class="s">A SINGH WITH BEES FARM</span></div>
+  </div>
+  <div id="hint" hidden>DRAG THE QUEEN TO THE HIVE<small>or tap her, then tap the hive</small></div>
+  <button id="enterBtn" hidden>Enter Nirvana Natura Farms</button>
+  <button id="sound" aria-pressed="false">&#9834; SOUND: OFF</button>
+  <button id="skip">SKIP &rsaquo;</button>
+  <div class="crt"></div>
+</div>
+
+<div id="farm" hidden>
+  <div class="wrap">
+    <header class="top">
+      <button class="logo" data-go="home">NIRVANA NATURA FARMS<span>HONEY BY SINGH WITH BEES</span></button>
+      <nav class="nav" aria-label="Site">
+        <button data-go="home">THE FARM</button>
+        <button data-go="exp">EXPERIENCE</button>
+        <button data-go="shop">SHOP</button>
+        <button class="btn-ghost" id="replay" style="margin-left:8px">&#9664; REPLAY GATE</button>
+      </nav>
+    </header>
+
+    <!-- ===== HOME ===== -->
+    <main id="v-home" data-view="home">
+      <section class="lede">
+        <div>
+          <p class="eyebrow">Walk the farm, front to back</p>
+          <h1>A small farm built around <em>the bees.</em></h1>
+        </div>
+        <p>This is the farm as you'd see it from above. Start at the farmhouse by the road, head out to the hive field, and finish at the extraction shed. Select any part of the map to read about it.</p>
+      </section>
+      <div class="mapcard">
+        <div class="scrollnote">SWIPE TO SEE THE WHOLE FARM &rarr;</div>
+        <div class="axis axis-top"><span>FRONT OF FARM &middot; BY THE ROAD &darr;</span></div><div class="mapscroll"><svg class="map" id="map-home" viewBox="0 0 1200 520" role="group" aria-label="Top-down map of Nirvana Natura Farms"></svg></div>
+        <div class="axis"><span class="a-front">&larr; FRONT OF FARM</span><i></i><span>BACK OF FARM<span class="arr"> &rarr;</span></span></div>
+      </div>
+      <section class="info">
+        <article class="panel" id="panel-home" aria-live="polite"></article>
+        <nav class="stops" aria-label="Farm stops"><p class="eyebrow">The walk</p><div id="stops-home"></div></nav>
+      </section>
+
+      <section>
+        <div class="sechead">
+          <div><p class="eyebrow">From the shed</p><h2>Honey &amp; experiences</h2></div>
+          <button class="btn-ghost" data-go="shop">GO TO THE PRODUCT PAGE &#9654;</button>
+        </div>
+        <div class="inv" data-inv="home"></div>
+      </section>
+    </main>
+
+    <!-- ===== EXPERIENCE ===== -->
+    <main id="v-exp" data-view="exp" hidden>
+      <section class="lede">
+        <div>
+          <p class="eyebrow">The beekeeping experience</p>
+          <h1>Spend a morning as <em>a beekeeper.</em></h1>
+        </div>
+        <p>A guided walk through the whole farm, from the safety briefing at the farmhouse to tasting honey in the extraction shed. Hover over each part of the map to see what you'll do there.</p>
+      </section>
+      <div class="mapcard" id="expcard">
+        <div class="scrollnote">SWIPE TO FOLLOW THE ROUTE &rarr;</div>
+        <div class="axis axis-top"><span>FRONT OF FARM &middot; BY THE ROAD &darr;</span></div><div class="mapscroll"><svg class="map" id="map-exp" viewBox="0 0 1200 520" role="group" aria-label="Route of the beekeeping experience"></svg></div>
+        <div class="axis"><span class="a-front">&larr; FRONT OF FARM</span><i></i><span>BACK OF FARM<span class="arr"> &rarr;</span></span></div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <section class="info">
+        <article class="panel" id="panel-exp" aria-live="polite"></article>
+        <nav class="stops" aria-label="Experience steps"><p class="eyebrow">Your route</p><div id="stops-exp"></div>
+          <div class="onexp" style="margin-top:14px">
+            <p class="eyebrow">Two tiers</p>
+            <p><b>Child</b> &middot; $45 CAD<br><b>Adult</b> &middot; price to be announced</p>
+            <button class="btn-solid" data-go="shop" data-item="2">BOOK IN THE SHOP &#9654;</button>
+          </div>
+        </nav>
+      </section>
+    </main>
+
+    <!-- ===== SHOP ===== -->
+    <main id="v-shop" data-view="shop" hidden>
+      <section class="lede">
+        <div>
+          <p class="eyebrow">The shop</p>
+          <h1>Pick an item from <em>the inventory.</em></h1>
+        </div>
+        <p>Honey jarred in the extraction shed, and a morning on the farm with the bees. Use the arrows or the item slots to switch between products.</p>
+      </section>
+      <div class="inv" data-inv="shop"></div>
+      <section class="details">
+        <div><h3>JARS</h3><p>Every jar is filled by hand in the extraction shed at the back of the farm. Both sizes are sold out right now. Check back after the next harvest.</p></div>
+        <div><h3>THE EXPERIENCE</h3><p>About a morning on the farm with a guide, start to finish. Suits, veils, gloves and tools are provided at the farmhouse.</p></div>
+        <div><h3>QUESTIONS</h3><p>For bookings, groups or wholesale, contact the farm through <a href="https://www.singhwithbees.ca" target="_blank" rel="noopener">singhwithbees.ca</a>.</p></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>NIRVANA NATURA FARMS &middot; ONTARIO</span>
+      <a href="https://www.singhwithbees.ca" target="_blank" rel="noopener">SINGHWITHBEES.CA</a>
+    </footer>
+  </div>
+</div>
+
+<script>
+(()=>{
+/* ================= shared ================= */
+const C={milk:'#ECEDE4',milk2:'#E1E3D7',milk3:'#F6F7F1',ink:'#263022',inkSoft:'#5B6553',honey:'#D9961A',honeyLt:'#F0C350',honeyDk:'#94600C',
+  leaf:'#4F7A3B',leafLt:'#6E9A4C',leafDk:'#365A29',trunk:'#6B4A2B',tuft:'#9DB57C',rose:'#D98A8F',queen:'#1C1714',wing:'#FFFFFF',wingE:'#A9B4B0'};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+/* ================= GAME ================= */
+const game=$('#game'), cv=$('#cv'), ctx=cv.getContext('2d'), boot=$('#boot'), hint=$('#hint'), enterBtn=$('#enterBtn'), skipBtn=$('#skip');
+let W=0,H=0,PX=4,QS=1, comb={x:0,y:0}, queenStart={x:0,y:0};
+let bg=document.createElement('canvas'), reveal=document.createElement('canvas'), tmp=document.createElement('canvas');
+let titleLayer=null, enterLayer=null, textRect={x:0,y:0,w:0,h:0}, enterRect={x:0,y:0,w:0,h:0}, fs=16;
+let state='boot', time=0, stateAt=0, interacted=false;
+const queen={x:0,y:0,grab:null, from:null};
+let drag=false, armed=false, downAt=null, bees=[], arrived=0, revealAll=0;
+let notes=[], noteClock=0;
+
+/* --- bee music: a little 8-bit loop over a buzzing drone, made live with Web Audio --- */
+const Music=(()=>{
+  let ac=null, master=null, on=false, timer=null, nextT=0, step=0, buzz=null;
+  const mf=m=>440*Math.pow(2,(m-69)/12);
+  const MEL=[76,79,81,79,76,74,72,74, 76,76,79,null,81,84,81,79, 76,79,81,79,76,74,72,69, 72,74,76,74,72,null,null,null];
+  const BASS=[48,55,48,55, 45,52,45,52, 41,48,41,48, 43,50,43,null];
+  const SP=60/150/2;
+  function blip(type,f,t,dur,vol){const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.03)}
+  function sched(){while(nextT<ac.currentTime+.2){const i=step%32, m=MEL[i];
+    if(m) blip('square',mf(m),nextT,SP*.85,.045);
+    if(i%2===0){const b=BASS[(i/2)%16]; if(b) blip('triangle',mf(b),nextT,SP*1.7,.13)}
+    if(i%4===2) blip('square',mf(100),nextT,.025,.01);
+    nextT+=SP;step++}}
+  function startBuzz(){const o=ac.createOscillator(),o2=ac.createOscillator(),lfo=ac.createOscillator(),lg=ac.createGain(),f=ac.createBiquadFilter(),g=ac.createGain();
+    o.type='sawtooth';o.frequency.value=196;o2.type='sawtooth';o2.frequency.value=199.5;lfo.frequency.value=6.5;lg.gain.value=5;
+    lfo.connect(lg);lg.connect(o.frequency);lg.connect(o2.frequency);
+    f.type='bandpass';f.frequency.value=720;f.Q.value=1.1;g.gain.value=.022;o.connect(f);o2.connect(f);f.connect(g);g.connect(master);
+    o.start();o2.start();lfo.start();buzz={g,stop(){try{o.stop();o2.stop();lfo.stop()}catch(_){}}}}
+  return{
+    start(){ if(on) return true;
+      try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); }catch(_){return false}
+      if(ac.state==='suspended') ac.resume();
+      master=ac.createGain();master.gain.setValueAtTime(0,ac.currentTime);master.gain.linearRampToValueAtTime(1,ac.currentTime+.6);master.connect(ac.destination);
+      startBuzz(); nextT=ac.currentTime+.1; step=0; timer=setInterval(sched,40); on=true; return true },
+    stop(fade=.4){ if(!on) return; on=false; clearInterval(timer); const m=master,b=buzz,t=ac.currentTime;
+      m.gain.cancelScheduledValues(t);m.gain.setValueAtTime(m.gain.value,t);m.gain.linearRampToValueAtTime(0,t+fade);
+      setTimeout(()=>{b.stop();try{m.disconnect()}catch(_){}} ,fade*1000+120) },
+    swell(){ if(!on||!buzz) return; const g=buzz.g.gain,t=ac.currentTime; g.setTargetAtTime(.075,t,.35); g.setTargetAtTime(.022,t+3.2,.8) },
+    get on(){return on}
+  };
+})();
+let userMuted=false;
+const soundBtn=document.getElementById('sound');
+function soundLabel(){soundBtn.setAttribute('aria-pressed',Music.on?'true':'false');soundBtn.innerHTML=Music.on?'&#9834; SOUND: ON':'&#9834; SOUND: OFF'}
+
+/* pixel music notes that drift up out of the hive */
+const NOTE_SPR=[
+  ["..##.","..#.#","..#..","..#..","###..","###.."],
+  ["..#####","..#...#","..#...#","###.###","###.###"],
+  [".#",".#",".#",".#","##","##"],
+];
+
+const SPR={
+  tree:["...GGGGG...","..GGgGGGGG.",".GGGGGgGGGG","GGgGGGGGGgG","GGGGGgGGGGG","GGGGGGGGgGG",".GgGGGGGGG.","..GGGGgGG..","....DTD....",".....T.....","....TTT...."],
+  sm:["..GGG..",".GgGGG.","GGGGgGG","GGgGGGG",".GGGGG.","..DTD..","...T..."],
+  queen:["...ee..ee....","..eWWeeWWe...","..eWWWWWWe...","...eWWWWe....",".KKAKKAKKKKK.","KKKAKKAKKKKKK","KKKAKKAKKKKEK",".KKAKKAKKKKK.","..K.K..K.K..."],
+};
+const PAL={G:C.leaf,g:C.leafLt,D:C.leafDk,T:C.trunk,K:C.queen,A:C.honey,W:C.wing,e:C.wingE,E:C.honeyLt};
+function sprite(c,s,x,y,scale=1,pal=PAL){const h=s.length,w=s[0].length;const ox=Math.round(x-w*scale/2),oy=Math.round(y-h*scale);
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const ch=s[j][i];if(ch==='.'||!pal[ch])continue;c.fillStyle=pal[ch];c.fillRect(ox+i*scale,oy+j*scale,scale,scale)}}
+
+function size(){
+  const vw=game.clientWidth||innerWidth, vh=game.clientHeight||innerHeight;
+  PX=Math.max(2,Math.round(Math.min(vw,vh)/170)); QS=PX<=2?2:1;
+  W=Math.ceil(vw/PX); H=Math.ceil(vh/PX);
+  for(const c of [cv,bg,reveal,tmp]){c.width=W;c.height=H}
+  ctx.imageSmoothingEnabled=false;
+  const portrait=W/H<1;
+  comb = portrait?{x:Math.round(W*.72),y:Math.round(H*.2)}:{x:Math.round(W*.85),y:Math.round(H*.3)};
+  queenStart = portrait?{x:Math.round(W*.24),y:Math.round(H*.87)}:{x:Math.round(W*.13),y:Math.round(H*.8)};
+  buildText(); buildBG();
+  if(state==='play'||state==='boot'){queen.x=queenStart.x;queen.y=queenStart.y}
+  if(state==='ready'||state==='swarm'){revealAll=1;fillReveal(1)}
+  placeEnter();
+}
+
+function threshold(c){const g=c.getContext('2d');const d=g.getImageData(0,0,c.width,c.height);const a=d.data;
+  for(let i=3;i<a.length;i+=4){a[i]=a[i]>105?255:0}g.putImageData(d,0,0)}
+function tint(mask,color){const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  g.drawImage(mask,0,0);g.globalCompositeOperation='source-in';g.fillStyle=color;g.fillRect(0,0,W,H);return c}
+function buildText(){
+  const portrait=W/H<1;
+  const lines=portrait?['NIRVANA','NATURA','FARMS']:['NIRVANA NATURA','FARMS'];
+  const maxC=Math.max(...lines.map(l=>l.length));
+  // Safe box the title must stay inside: clear of the hive (and its branch) and the corner buttons.
+  const mg=8, botM=Math.ceil(64/PX), topM=Math.ceil(20/PX);
+  const combL=comb.x-34, combB=comb.y+18;
+  const box=portrait?{x0:mg,x1:W-mg,y0:combB+mg,y1:H-botM}:{x0:mg,x1:combL-mg,y0:topM,y1:H-botM};
+  const bw=box.x1-box.x0, bh=box.y1-box.y0;
+  const cx=Math.round((box.x0+box.x1)/2), cy=Math.round((box.y0+box.y1)/2);
+  // measure real glyph widths, then fit: at most ~70% of the box width, and modest overall
+  const mc=document.createElement('canvas').getContext('2d'); mc.font='20px "Press Start 2P", monospace';
+  const perPx=Math.max(...lines.map(l=>mc.measureText(l).width))/20;
+  const hPer=lines.length*1.45+1.4+.6;
+  fs=Math.floor(Math.min(bw*(portrait?.86:.7)/perPx, bh*.8/hPer, portrait?W/7.5:H/12));
+  fs=Math.max(8,fs);
+  const lh=Math.round(fs*1.45), efs=Math.max(8,Math.floor(fs*.5));
+  const total=lines.length*lh+Math.round(efs*2.8);
+  const top=Math.round(Math.max(box.y0,cy-total/2));
+  const m=document.createElement('canvas');m.width=W;m.height=H;const g=m.getContext('2d');
+  g.font=`${fs}px "Press Start 2P", monospace`;g.textAlign='center';g.textBaseline='top';g.fillStyle='#000';
+  let maxW=0; lines.forEach((l,i)=>{g.fillText(l,cx,top+i*lh);maxW=Math.max(maxW,g.measureText(l).width)});
+  threshold(m);
+  const off=fs>=16?2:1;
+  titleLayer=document.createElement('canvas');titleLayer.width=W;titleLayer.height=H;
+  const tg=titleLayer.getContext('2d');tg.drawImage(tint(m,C.honey),off,off);tg.drawImage(tint(m,C.ink),0,0);
+  const e=document.createElement('canvas');e.width=W;e.height=H;const eg=e.getContext('2d');
+  eg.font=`${efs}px "Press Start 2P", monospace`;eg.textAlign='center';eg.textBaseline='top';eg.fillStyle='#000';
+  const ey=top+lines.length*lh+Math.round(efs*1.2), label='> ENTER <';eg.fillText(label,cx,ey);
+  const ew=eg.measureText(label).width; threshold(e);
+  enterLayer=document.createElement('canvas');enterLayer.width=W;enterLayer.height=H;
+  enterLayer.getContext('2d').drawImage(tint(e,C.honeyDk),0,0);
+  textRect={x:cx-maxW/2,y:top,w:maxW,h:total};
+  enterRect={x:cx-ew/2-6,y:ey-5,w:ew+12,h:efs+10};
+}
+function blocked(x,y,p){
+  if(Math.hypot(x-comb.x,y-comb.y)<26+p) return true;
+  if(Math.hypot(x-queenStart.x,y-queenStart.y)<14+p) return true;
+  if(x>textRect.x-p&&x<textRect.x+textRect.w+p&&y>textRect.y-p&&y<textRect.y+textRect.h+p) return true;
+  return false;
+}
+function buildBG(){
+  const b=bg.getContext('2d'), r=rng(11);
+  b.fillStyle=C.milk;b.fillRect(0,0,W,H);
+  for(let i=0;i<W*H*.025;i++){b.fillStyle=r()<.55?C.milk2:C.milk3;b.fillRect(r()*W|0,r()*H|0,1,1)}
+  for(let i=0;i<W*H/240;i++){const x=r()*W|0,y=r()*H|0;if(blocked(x,y,2))continue;b.fillStyle=C.tuft;b.fillRect(x,y,1,1);b.fillRect(x-1,y-1,1,1);b.fillRect(x+1,y-1,1,1)}
+  for(let i=0;i<W*H/1300;i++){const x=r()*W|0,y=r()*H|0;if(blocked(x,y,3))continue;b.fillStyle=r()<.5?C.wing:C.rose;
+    b.fillRect(x-1,y,1,1);b.fillRect(x+1,y,1,1);b.fillRect(x,y-1,1,1);b.fillRect(x,y+1,1,1);b.fillStyle=C.honey;b.fillRect(x,y,1,1)}
+  const trees=[],target=Math.round(W*H/2000);let tries=0;
+  while(trees.length<target&&tries++<target*30){const x=4+r()*(W-8)|0,y=10+r()*(H-6)|0;if(blocked(x,y-5,9))continue;
+    if(trees.some(t=>Math.abs(t.x-x)<12&&Math.abs(t.y-y)<11))continue;trees.push({x,y,s:r()<.35?SPR.sm:SPR.tree})}
+  trees.sort((a,b)=>a.y-b.y);
+  for(const t of trees){b.fillStyle='rgba(38,48,34,.12)';b.fillRect(t.x-4,t.y,9,1);sprite(b,t.s,t.x,t.y)}
+  b.fillStyle=C.trunk;const by=comb.y-19;b.fillRect(comb.x-24,by,48,2);b.fillRect(comb.x+18,by-2,8,2);b.fillRect(comb.x-30,by+1,7,1);
+  b.fillStyle=C.leaf;for(const dx of [-26,-14,20,27]){b.fillRect(comb.x+dx,by-2,3,2)}
+  b.fillStyle=C.honeyDk;b.fillRect(comb.x-1,by+2,2,3);
+}
+function hexIn(dx,dy,r){dx=Math.abs(dx);dy=Math.abs(dy);return dx<=r*.866&&dy<=r-dx*.5774}
+const CELLS=(()=>{const a=[[0,0]];for(let k=0;k<6;k++){const ang=k*Math.PI/3;a.push([Math.cos(ang),Math.sin(ang)])}return a})();
+function drawComb(glow){
+  const r=6,d=Math.sqrt(3)*r, fill=Math.min(1,arrived/Math.max(1,bees.length||1)), hasQ=state==='swarm'||state==='ready'||state==='off';
+  for(let k=0;k<CELLS.length;k++){
+    const cx=comb.x+CELLS[k][0]*d, cy=comb.y+CELLS[k][1]*d;
+    for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
+      const dx=x+.5-cx,dy=y+.5-cy; if(!hexIn(dx,dy,r))continue;
+      let col; if(!hexIn(dx,dy,r-1.2)) col=C.honeyDk;
+      else { const lit=(dx<-1.5&&dy<-1)||(k>0&&fill>(k/7)); col=lit?C.honeyLt:C.honey; }
+      ctx.fillStyle=col;ctx.fillRect(x,y,1,1);
+    }
+  }
+  ctx.fillStyle=hasQ?C.honeyDk:'#3B2A10';ctx.fillRect(comb.x-2,comb.y-1,4,3);ctx.fillRect(comb.x-1,comb.y-2,2,5);
+  if(glow){const n=18,R=21+Math.sin(time*6)*1.2;ctx.fillStyle=C.honey;
+    for(let i=0;i<n;i++){const a=i/n*Math.PI*2+time*1.4;ctx.fillRect(Math.round(comb.x+Math.cos(a)*R),Math.round(comb.y+Math.sin(a)*R),1,1)}}
+}
+function drawBee(x,y,f){x=Math.round(x);y=Math.round(y);
+  ctx.fillStyle=C.wing;ctx.fillRect(x+(f?1:0),y-1,1,1);ctx.fillStyle=C.wingE;ctx.fillRect(x+(f?0:1),y-1,1,1);
+  ctx.fillStyle=C.honeyLt;ctx.fillRect(x-1,y,1,2);ctx.fillRect(x+1,y,1,2);
+  ctx.fillStyle=C.queen;ctx.fillRect(x,y,1,2);ctx.fillRect(x+2,y,1,1);}
+function drawQueen(x,y){sprite(ctx,SPR.queen,x,y+5*QS,QS)}
+
+function fillReveal(a){const g=reveal.getContext('2d');g.globalAlpha=a;g.fillStyle='#000';g.fillRect(0,0,W,H);g.globalAlpha=1}
+function setState(s){state=s;stateAt=time}
+function spawnSwarm(){
+  const r=rng((Math.random()*1e9)|0), N=Math.max(180,Math.min(650,Math.round(W*H/110)));
+  bees=[];arrived=0;
+  for(let i=0;i<N;i++){const y0=H*(.04+.94*r());
+    bees.push({x0:-3-r()*36,y0,cx:W*(.3+.35*r()),cy:y0+(r()-.5)*H*.35,
+      delay:r()*2.6,dur:2.4+r()*1.8,amp:1.5+r()*5,freq:7+r()*9,ph:r()*6.28,done:false,x:-10,y:-10,tx:(r()-.5)*8,ty:(r()-.5)*6})}
+}
+function pt(e){const b=cv.getBoundingClientRect();return{x:(e.clientX-b.left)/b.width*W,y:(e.clientY-b.top)/b.height*H}}
+const hitR=()=>Math.max(11,24/PX)*(QS>1?1.4:1);
+function deliver(){ if(Math.hypot(queen.x-comb.x,queen.y-comb.y)<20){queen.from={x:queen.x,y:queen.y};drag=false;armed=false;cv.style.cursor='default';hint.hidden=true;setState('entering');return true}return false}
+
+cv.addEventListener('pointerdown',e=>{ if(state!=='play')return; const p=pt(e);
+  if(armed){queen.x=p.x;queen.y=p.y;deliver();return}
+  if(Math.hypot(p.x-queen.x,p.y-queen.y)<hitR()){drag=true;interacted=true;hint.hidden=true;downAt=p;queen.grab={dx:queen.x-p.x,dy:queen.y-p.y};
+    try{cv.setPointerCapture(e.pointerId)}catch(_){} cv.style.cursor='grabbing'}
+});
+cv.addEventListener('pointermove',e=>{const p=pt(e);
+  if(state!=='play')return;
+  if(drag){queen.x=Math.max(4,Math.min(W-4,p.x+queen.grab.dx));queen.y=Math.max(6,Math.min(H-2,p.y+queen.grab.dy))}
+  else if(armed&&e.pointerType==='mouse'){queen.x=p.x;queen.y=p.y}
+  else cv.style.cursor=Math.hypot(p.x-queen.x,p.y-queen.y)<hitR()?'grab':'default';
+});
+cv.addEventListener('pointerup',e=>{ if(!drag)return; const p=pt(e); drag=false; cv.style.cursor='default';
+  if(Math.hypot(p.x-downAt.x,p.y-downAt.y)<2.5){armed=true}else deliver();
+});
+
+function placeEnter(){const b=cv.getBoundingClientRect(),sx=b.width/W,sy=b.height/H;
+  Object.assign(enterBtn.style,{left:enterRect.x*sx+'px',top:enterRect.y*sy+'px',width:enterRect.w*sx+'px',height:enterRect.h*sy+'px'})}
+
+let last=0;
+function frame(ts){
+  const dt=Math.min(.05,(ts-last)/1000||0);last=ts;time+=dt;
+  if(game.hidden){requestAnimationFrame(frame);return}
+  ctx.drawImage(bg,0,0);
+  const nearComb=Math.hypot(queen.x-comb.x,queen.y-comb.y)<34;
+  drawComb(state==='play'&&(drag||armed||nearComb||(!interacted&&time-stateAt>3.5)));
+
+  // music notes rising from the hive
+  if(state!=='boot'&&state!=='off'){
+    noteClock+=dt; const every=Music.on?.32:.6;
+    while(noteClock>every){noteClock-=every; if(notes.length<40){const k=Math.random()*3|0;
+      notes.push({x:comb.x+(Math.random()-.5)*14,y:comb.y-6,vx:(Math.random()-.5)*26,vy:-(9+Math.random()*7),age:0,life:2.4+Math.random()*1.4,ph:Math.random()*6,spr:NOTE_SPR[k],col:Math.random()<.55?C.ink:C.honeyDk})}}
+  }
+  for(let i=notes.length-1;i>=0;i--){const n=notes[i];n.age+=dt;if(n.age>n.life){notes.splice(i,1);continue}
+    n.x+=n.vx*dt;n.y+=n.vy*dt;const wx=Math.sin(n.age*4+n.ph)*2.2, f=n.age/n.life;
+    ctx.globalAlpha=f>.6?Math.max(0,1-(f-.6)/.4):Math.min(1,n.age*4);
+    const pal={'#':n.col}; sprite(ctx,n.spr,n.x+wx,n.y,1,pal); ctx.globalAlpha=1}
+
+  if(state==='play'&&!interacted&&time-stateAt>3.5&&hint.hidden){hint.hidden=false;if(!reduce)hint.classList.add('blink')}
+
+  if(state==='swarm'||state==='ready'){
+    const g=reveal.getContext('2d');g.fillStyle='#000';const rr=Math.max(7,fs*1.1);
+    const st=time-stateAt;
+    for(const b of bees){ if(b.done)continue; const t=(st-b.delay)/b.dur; if(t<0)continue;
+      if(t>=1){b.done=true;arrived++;continue}
+      const u=1-t, e=t*t*(3-2*t)*.6+t*.4;
+      const ex=comb.x+b.tx*u, ey=comb.y+b.ty*u;
+      const X=(1-e)*(1-e)*b.x0+2*(1-e)*e*b.cx+e*e*ex, Y=(1-e)*(1-e)*b.y0+2*(1-e)*e*b.cy+e*e*ey;
+      b.x=X; b.y=Y+Math.sin(t*b.freq+b.ph)*b.amp*u;
+      if(X>-2){g.beginPath();g.arc(b.x,b.y,rr,0,7);g.fill()}
+    }
+    // once the front of the swarm has crossed the title, fill in the rest so the whole name shows
+    if(revealAll===0&&st>2.0) revealAll=0.001;
+    if(revealAll>0&&revealAll<1){revealAll=Math.min(1,revealAll+dt*.75);fillReveal(.06+revealAll*.25);
+      if(revealAll>=1){fillReveal(1);enterBtn.hidden=false;placeEnter()}}
+    if(state==='swarm'&&(arrived>=bees.length||st>7.5)) setState('ready');
+    const tg=tmp.getContext('2d');tg.clearRect(0,0,W,H);tg.globalCompositeOperation='source-over';
+    tg.drawImage(titleLayer,0,0);
+    if(revealAll>=1){ if(reduce||Math.floor(time*1.8)%2===0) tg.drawImage(enterLayer,0,0) } else tg.drawImage(enterLayer,0,0);
+    tg.globalCompositeOperation='destination-in';tg.drawImage(reveal,0,0);tg.globalCompositeOperation='source-over';
+    ctx.drawImage(tmp,0,0);
+    const flap=Math.floor(time*20)%2;
+    for(const b of bees){if(b.done)continue; if(b.x>-3&&st>b.delay) drawBee(b.x,b.y,flap^((b.ph*10|0)&1))}
+  }
+
+  if(state==='play'||state==='boot'){
+    const bob=(drag||armed)?0:Math.round(Math.sin(time*3)*1);
+    drawQueen(queen.x,queen.y+bob);
+    if(armed){ctx.fillStyle=C.honey;const R=10+QS*3;for(let i=0;i<12;i++){const a=i/12*6.283+time*2;ctx.fillRect(Math.round(queen.x+Math.cos(a)*R),Math.round(queen.y+Math.sin(a)*R*.7),1,1)}}
+    if(state==='play'&&!interacted&&time-stateAt>2.2){
+      const ay=Math.round(queen.y-10*QS-5+Math.sin(time*5)*2);ctx.fillStyle=C.honeyDk;
+      for(let i=0;i<4;i++)ctx.fillRect(queen.x-3+i,ay+i,7-2*i,1);ctx.fillRect(queen.x-1,ay-3,3,3);
+    }
+  } else if(state==='entering'){
+    const t=Math.min(1,(time-stateAt)/.6), e=1-Math.pow(1-t,3);
+    const x=queen.from.x+(comb.x-queen.from.x)*e, y=queen.from.y+(comb.y-queen.from.y)*e;
+    if(t<.85) drawQueen(x,y);
+    if(t>.7){ctx.fillStyle=C.honeyLt;const k=(t-.7)*40;for(let i=0;i<8;i++){const a=i/8*6.283;ctx.fillRect(Math.round(comb.x+Math.cos(a)*k),Math.round(comb.y+Math.sin(a)*k),1,1)}}
+    if(t>=1){reveal.getContext('2d').clearRect(0,0,W,H);revealAll=0;spawnSwarm();setState('swarm');Music.swell()}
+  }
+  requestAnimationFrame(frame);
+}
+
+function startPlay(){ if(state!=='boot')return; boot.hidden=true; setState('play'); }
+game.addEventListener('pointerdown',e=>{ if(e.target===soundBtn||e.target===skipBtn) return;
+  if(!userMuted&&!Music.on&&state!=='off'){Music.start();soundLabel()} },true);
+soundBtn.addEventListener('click',()=>{ if(Music.on){Music.stop();userMuted=true}else{userMuted=false;Music.start()} soundLabel() });
+boot.addEventListener('click',startPlay);
+boot.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();startPlay()}});
+boot.addEventListener('animationend',startPlay);
+
+function goFarm(){ if(state==='off')return; setState('off'); enterBtn.hidden=true; hint.hidden=true; Music.stop(.7); setTimeout(soundLabel,800); notes=[];
+  if(reduce){showFarm();return}
+  game.classList.add('off'); setTimeout(showFarm,760);
+}
+function showFarm(){ game.hidden=true; game.classList.remove('off'); document.documentElement.classList.remove('in-game');
+  const f=$('#farm'); f.hidden=false; requestAnimationFrame(()=>f.classList.add('show'));
+  const h=(location.hash||'').slice(1); go(['exp','shop'].includes(h)?h:'home',false); }
+enterBtn.addEventListener('click',goFarm);
+skipBtn.addEventListener('click',goFarm);
+addEventListener('keydown',e=>{ if(e.key==='Enter'&&(state==='ready'||state==='swarm')&&revealAll>=1&&document.activeElement!==enterBtn) goFarm() });
+
+function resetGame(){
+  const f=$('#farm'); f.classList.remove('show'); f.hidden=true;
+  document.documentElement.classList.add('in-game'); game.hidden=false;
+  bees=[];arrived=0;revealAll=0;interacted=false;drag=false;armed=false;notes=[];
+  reveal.getContext('2d').clearRect(0,0,W,H); enterBtn.hidden=true; hint.hidden=true; hint.classList.remove('blink');
+  state='boot'; queen.x=queenStart.x; queen.y=queenStart.y;
+  boot.hidden=false; boot.classList.remove('run'); void boot.offsetWidth; boot.classList.add('run');
+}
+$('#replay').addEventListener('click',resetGame);
+
+let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(!game.hidden)size()},120)});
+
+document.documentElement.classList.add('in-game');
+const fontP = document.fonts && document.fonts.load ? document.fonts.load('16px "Press Start 2P"') : Promise.resolve();
+Promise.race([fontP, new Promise(r=>setTimeout(r,2500))]).catch(()=>{}).then(()=>{size();requestAnimationFrame(frame)});
+
+/* ================= VIEWS ================= */
+let inventories=[];
+function go(view,scroll=true,item){
+  $$('main[data-view]').forEach(m=>m.hidden=m.dataset.view!==view);
+  $$('.nav [data-go]').forEach(b=>b.setAttribute('aria-current',b.dataset.go===view?'page':'false'));
+  try{history.replaceState(null,'',view==='home'?location.pathname+location.search:'#'+view)}catch(_){}
+  if(item!=null) inventories.forEach(inv=>inv.root.dataset.inv===view&&inv.set(+item));
+  if(scroll) window.scrollTo({top:0,behavior:'auto'});
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;go(b.dataset.go,true,b.dataset.item)});
+
+/* ================= FARM MAPS ================= */
+// Walk order follows the experience: house -> garden -> fruit & flowers -> hive field -> extraction shed
+const ZONES=[
+ {id:'house',short:'Farmhouse',n:1,name:'Farmhouse',sub:'Our story',
+  html:`<p class="eyebrow">Stop 1 of 5 &middot; Farmhouse</p><h2>Our story</h2>
+  <p>Nirvana Natura Farms is a family farm, and the farmhouse at the front of the property is where it all starts. The family that lives here keeps the bees, tends the gardens and fills every jar sold under the Singh With Bees name.</p>
+  <p>The farm is laid out the way the work flows: home and garden by the road, flowers and fruit in the middle, the hives in the quiet open field at the back, and the extraction shed where the honey ends up.</p>`,
+  exp:'Every beekeeping experience begins here with a safety briefing and the farm rules, and this is where you collect your gear.'},
+ {id:'garden',short:'Garden',n:2,name:'Kitchen garden',sub:'Beds and the meeting lawn',
+  html:`<p class="eyebrow">Stop 2 of 5 &middot; Kitchen garden</p><h2>Vegetables, herbs and a patch of lawn</h2>
+  <p>Behind the farmhouse, raised beds grow vegetables and herbs for the family table. Whatever is left to flower, like basil, squash and beans, becomes an easy stop for bees on their way to and from the field.</p>
+  <p>The far end of the garden is left as open grass. It's the meeting lawn, where every visit to the hives gets underway.</p>`,
+  exp:'On the meeting lawn you put on your suit and veil and learn the smoker and hive tool before heading out.'},
+ {id:'flowers',short:'Fruit & flowers',n:3,name:'Fruit & flowers',sub:'Forage for the bees',
+  html:`<p class="eyebrow">Stop 3 of 5 &middot; Fruit &amp; flowers</p><h2>Something always in bloom</h2>
+  <p>Past the row of trees is a garden of fruit trees and flowers, planted for the bees as much as for the people. Bees need two things from plants: nectar, which they turn into honey, and pollen, which is their only source of protein.</p>
+  <p>Fruit trees open first in spring, flowers carry the colonies through summer, and late bloomers keep them fed into fall. When good forage grows close to the hives, bees spend less energy flying and more on building strong colonies.</p>
+  <p>It works both ways. The bees pollinate the fruit trees, and better pollination means more fruit at harvest.</p>
+  <div class="facts"><span>NECTAR &rarr; HONEY</span><span>POLLEN &rarr; PROTEIN</span><span>SPRING TO FALL BLOOMS</span></div>`,
+  exp:'Walk the rows, watch foragers at work, and pick a fruit or flower if something is in season.'},
+ {id:'hives',short:'Hive field',n:4,name:'Hive field',sub:'The bees and their honey',
+  html:`<p class="eyebrow">Stop 4 of 5 &middot; Hive field</p><h2>The bees and their honey</h2>
+  <p>The open field at the back of the farm belongs to the bees. Each hive is one colony: a single queen, thousands of female workers and, in summer, a few hundred male drones. A strong colony can reach tens of thousands of bees in midsummer.</p>
+  <p>Because the bees forage on the farm and the land around it, the honey tastes like this place. Its colour and flavour change through the season with whatever happens to be blooming.</p>
+  <div class="facts"><span>1 QUEEN PER HIVE</span><span>WORKERS FORAGE</span><span>LOCAL HONEY</span></div>`,
+  exp:'Your guide opens a hive with you. Lift out frames and meet the workers, the drones and, with luck, the queen.'},
+ {id:'shed',short:'Shed',n:5,name:'Extraction shed',sub:'From frame to jar',
+  html:`<p class="eyebrow">Stop 5 of 5 &middot; Extraction shed</p><h2>From frame to jar</h2>
+  <p>The small shed beside the garden is where the honey comes out of the comb. It's done by hand, in small batches.</p>
+  <ol>
+   <li><span><b>Pull the frames</b>Frames come out of the hive once the bees have sealed the honey under a cap of wax, which means it's ripe.</span></li>
+   <li><span><b>Uncap</b>A warm knife slices the thin wax cappings off both sides of each frame.</span></li>
+   <li><span><b>Spin</b>The frames go into the extractor, which spins the honey out and leaves the comb whole so the bees can reuse it.</span></li>
+   <li><span><b>Strain and settle</b>The honey runs through a fine strainer, then rests so air bubbles rise to the top.</span></li>
+   <li><span><b>Jar it</b>Each batch is poured into jars and labelled by hand.</span></li>
+  </ol>`,
+  exp:'The experience ends here. Watch a frame get uncapped and spun, taste the honey, and pick up a jar.'},
+];
+const EXP=[
+ {id:'house',title:'Check in and gear up',tip:'Safety briefing, farm rules and collecting your gear.',
+  html:`<p class="eyebrow">Step 1 of 5 &middot; At the farmhouse</p><h2>Check in and gear up</h2>
+  <p>Your morning starts at the farmhouse. Your guide walks through safety and the farm rules, answers questions, and hands out the equipment you'll use for the rest of the visit.</p>
+  <ul>
+   <li><span><b>Allergies first.</b> Tell us about any allergy to bee stings before you book.</span></li>
+   <li><span><b>Dress for the hives.</b> Long pants, closed-toe shoes, and light colours. Leave perfume and scented lotions at home.</span></li>
+   <li><span><b>The rules.</b> Stay with your guide, move slowly, and never swat at a bee.</span></li>
+   <li><span><b>Your kit.</b> A bee suit or jacket with a veil, gloves, a hive tool and a smoker.</span></li>
+  </ul>`},
+ {id:'garden',title:'Suit up on the lawn',tip:'Put on your suit and veil, light the smoker, learn the tools.',
+  html:`<p class="eyebrow">Step 2 of 5 &middot; Kitchen garden</p><h2>Suit up on the lawn</h2>
+  <p>At the grassy end of the kitchen garden, the group gets ready together. This is where the beekeeping really begins.</p>
+  <ul>
+   <li><span>Put on your suit and veil, tuck in your cuffs, and check each other's zips.</span></li>
+   <li><span>Watch your guide light the smoker and learn why a little cool smoke keeps bees calm.</span></li>
+   <li><span>Learn how to hold the hive tool and how to move around an open hive.</span></li>
+  </ul>`},
+ {id:'flowers',title:'Watch the foragers',tip:'Watch bees work the blossoms and pick a fruit or flower in season.',
+  html:`<p class="eyebrow">Step 3 of 5 &middot; Fruit &amp; flowers</p><h2>Watch the foragers</h2>
+  <p>On the way to the hives, the route runs through the fruit trees and flower beds. Slow down and watch the bees at work.</p>
+  <ul>
+   <li><span>Spot foragers moving from bloom to bloom, and the bright pollen packed onto their back legs.</span></li>
+   <li><span>Learn which plants the bees rely on through the season.</span></li>
+   <li><span>If something is ripe or in bloom, pick a fruit or a flower to take with you.</span></li>
+  </ul>`},
+ {id:'hives',title:'Open a hive',tip:'Lift frames from a hive and meet the queen, workers and drones.',
+  html:`<p class="eyebrow">Step 4 of 5 &middot; Hive field</p><h2>Open a hive</h2>
+  <p>In the hive field your guide opens a hive with the group and lifts out frames one at a time.</p>
+  <ul>
+   <li><span><b>Workers</b> are the females that do nearly every job, from cleaning cells to foraging.</span></li>
+   <li><span><b>Drones</b> are the males: bigger, with large eyes and no sting.</span></li>
+   <li><span><b>The queen</b> has a longer body. Spotting her among thousands of bees is the challenge of the day.</span></li>
+   <li><span>See eggs and brood, stored pollen and capped honey, and hold a frame if you're comfortable.</span></li>
+  </ul>`},
+ {id:'shed',title:'Extract and taste',tip:'Uncap and spin a frame, taste the honey and visit the shop.',
+  html:`<p class="eyebrow">Step 5 of 5 &middot; Extraction shed</p><h2>Extract and taste</h2>
+  <p>The visit ends where the honey does. In the extraction shed you see the last part of the process up close.</p>
+  <ul>
+   <li><span>Uncap a frame with a warm knife and load it into the extractor.</span></li>
+   <li><span>Watch the honey spin out of the comb and run through the strainer.</span></li>
+   <li><span>Taste it fresh, then take a jar home from the shop when it's in stock.</span></li>
+  </ul>`},
+];
+
+const HIVES=(()=>{const h=[];for(let row=0;row<3;row++)for(let col=0;col<5;col++)h.push([878+col*62+(row%2)*14,118+row*104]);return h})();
+const ANCHOR={house:[156,243],garden:[382,384],flowers:[674,250],hives:[996,240],shed:[378,84]};
+
+const mqPort=matchMedia('(max-width: 640px)'); const isPort=()=>mqPort.matches;
+function buildMap(svg,mode){
+  const r=rng(42); let s=''; const P=isPort();
+  svg.setAttribute('viewBox',P?'0 0 520 1200':'0 0 1200 520');
+  svg.classList.toggle('port',P); svg.closest('.mapcard').classList.toggle('port',P);
+  const gen=svg._gen=(svg._gen||0)+1;
+  // T(): a label. In portrait the whole drawing is rotated 90deg (front of farm at top), so labels get a counter-rotation and their own portrait position [X,Y].
+  const T=(cls,x,y,txt,pp)=>{ if(P&&pp){const x0=pp[1],y0=520-pp[0];return `<text class="${cls}" x="${x0}" y="${y0}" transform="rotate(-90 ${x0} ${y0})">${txt}</text>`} return `<text class="${cls}" x="${x}" y="${y}">${txt}</text>`};
+  const lab=id=>{const z=ZONES.find(z=>z.id===id);return `${z.n} &middot; ${(P?z.short:z.name).toUpperCase().replace('&','&amp;')}`};
+  s+=`<rect x="8" y="8" width="1184" height="504" rx="18" class="boundary"/>`;
+  s+=`<path class="ink thin dash" d="M8 238 H60"/><path class="ink thin dash" d="M8 262 H60"/>`;
+  s+=`<path class="ink thin dash" d="M236 296 C 262 300, 268 316, 288 316"/>`;
+  s+=`<path class="ink thin dash" d="M236 196 C 262 190, 272 92, 302 86"/>`;
+  // ZONE farmhouse
+  s+=`<g class="zone" data-zone="house" tabindex="0" role="button" aria-label="Farmhouse">
+    <rect class="hit" x="22" y="118" width="236" height="270" rx="12"/>
+    <rect class="ink soft" x="78" y="168" width="156" height="150"/>
+    <path class="ink" d="M78 168 L118 243 L194 243 L234 168 M78 318 L118 243 M194 243 L234 318"/>
+    <rect class="ink soft" x="56" y="222" width="22" height="56"/>
+    <path class="ink thin" d="M56 236 H78 M56 250 H78 M56 264 H78"/>
+    <rect class="ink soft" x="196" y="180" width="16" height="16"/>
+    <circle class="ink" cx="52" cy="160" r="16"/><circle class="ink thin" cx="52" cy="160" r="8"/>
+    <circle class="ink" cx="48" cy="338" r="13"/><circle class="ink thin" cx="98" cy="350" r="9"/>
+    <rect class="ink thin" x="20" y="268" width="8" height="10"/>
+    ${T('lbl',156,368,lab('house'),[100,190])}
+  </g>`;
+  // ZONE extraction shed (top)
+  s+=`<g class="zone" data-zone="shed" tabindex="0" role="button" aria-label="Extraction shed">
+    <rect class="hit" x="276" y="18" width="210" height="166" rx="12"/>
+    <rect class="ink soft" x="308" y="40" width="140" height="88"/>
+    <path class="ink" d="M308 84 H448"/>
+    <path class="ink thin" d="M308 40 L320 84 L308 128 M448 40 L436 84 L448 128"/>
+    <rect class="ink soft" x="302" y="71" width="6" height="26"/>
+    <circle class="ink" cx="466" cy="56" r="11"/><circle class="ink thin" cx="466" cy="56" r="4"/>
+    <rect class="ink thin" x="458" y="98" width="16" height="12" rx="2"/>
+    ${T('lbl',380,164,lab('shed'),[436,290])}
+  </g>`;
+  // ZONE kitchen garden (bottom) with vegetable beds + meeting lawn
+  let beds='';
+  for(let i=0;i<2;i++){const y=214+i*46;beds+=`<rect class="ink thin" x="302" y="${y}" width="160" height="30" rx="3"/>`;
+    for(let x=314;x<454;x+=17){const rr=3+r()*2.5;beds+= i%2? `<path class="ink thin" d="M${x-4} ${y+15} L${x} ${y+9} L${x+4} ${y+15} L${x} ${y+21} Z"/>`:`<circle class="ink thin" cx="${x}" cy="${y+15}" r="${rr.toFixed(1)}"/>`}}
+  let lawn='';
+  for(let i=0;i<70;i++){const x=306+r()*152,y=318+r()*128; if(Math.hypot(x-382,y-384)<36)continue; lawn+=`<path class="grass" d="M${x.toFixed(0)} ${y.toFixed(0)} l2 -5 l2 5"/>`}
+  let stools='';for(let k=0;k<6;k++){const a=k/6*6.283+.3;stools+=`<circle class="ink thin soft" cx="${(382+Math.cos(a)*24).toFixed(1)}" cy="${(384+Math.sin(a)*24).toFixed(1)}" r="5"/>`}
+  s+=`<g class="zone" data-zone="garden" tabindex="0" role="button" aria-label="Kitchen garden">
+    <rect class="hit" x="276" y="190" width="210" height="318" rx="12"/>
+    <path class="ink dash" d="M288 300 V200 H476 V476 H288 V330"/>
+    ${beds}
+    <rect class="ink thin dash" x="300" y="310" width="164" height="150" rx="10"/>
+    ${lawn}${stools}
+    <path class="ink thin" d="M378 380 h8 v8 h-8 z M380 380 v-4 h4 v4"/>
+    ${T('lbl-s',382,452,'MEETING LAWN',[135,452])}
+    ${T('lbl',382,499,lab('garden'),[165,272])}
+  </g>`;
+  // tree row divider
+  let row='';for(let y=38;y<=482;y+=37){const rr=15+r()*3;row+=`<circle class="ink" cx="${520+(r()-.5)*4}" cy="${y}" r="${rr.toFixed(1)}"/><path class="ink thin" d="M514 ${y-3} q6 -6 12 0"/>`}
+  s+=`<g aria-hidden="true">${row}</g>`;
+  // ZONE fruit & flowers
+  let fruit='';
+  for(const [x,y] of [[606,92],[742,92],[606,248],[742,248],[606,404],[742,404]]){
+    fruit+=`<circle class="ink soft" cx="${x}" cy="${y}" r="31"/><circle class="ink thin dash" cx="${x}" cy="${y}" r="19"/><circle class="ink thin" cx="${x}" cy="${y}" r="2.5"/>`;
+    for(let k=0;k<6;k++){const a=k/6*6.283+r();fruit+=`<circle class="fruit" cx="${(x+Math.cos(a)*24).toFixed(1)}" cy="${(y+Math.sin(a)*24).toFixed(1)}" r="3.2"/>`}}
+  let fl='';
+  const flower=(x,y,sc)=>{let o='';for(let k=0;k<5;k++){const a=k/5*6.283;o+=`<circle class="petal" cx="${(x+Math.cos(a)*3.6*sc).toFixed(1)}" cy="${(y+Math.sin(a)*3.6*sc).toFixed(1)}" r="${(2.6*sc).toFixed(1)}"/>`}return o+`<circle class="pcore" cx="${x}" cy="${y}" r="${(2*sc).toFixed(1)}"/>`};
+  for(let y=46;y<456;y+=26){fl+=flower(674+(r()-.5)*14,y+(r()-.5)*8,.9+r()*.3)}
+  for(let i=0;i<10;i++){const x=568+r()*212,y=150+r()*30+(i%3)*155;fl+=flower(x,y,.7)}
+  s+=`<g class="zone" data-zone="flowers" tabindex="0" role="button" aria-label="Fruit and flowers">
+    <rect class="hit" x="550" y="22" width="244" height="476" rx="12"/>
+    ${fruit}${fl}
+    ${T('lbl',674,484,lab('flowers'),[260,806])}
+  </g>`;
+  // ZONE hive field
+  let field='';
+  for(let i=0;i<260;i++){const x=826+r()*350,y=24+r()*430; if(HIVES.some(([hx,hy])=>Math.abs(x-hx)<26&&Math.abs(y-hy)<22))continue; if(y>430&&Math.abs(x-996)<80)continue; if(x>1150&&Math.abs(y-260)<110)continue;
+    field+= r()<.86?`<path class="ink thin" d="M${x.toFixed(0)} ${y.toFixed(0)} l3 -6 l3 6" style="stroke:var(--ink-soft)"/>`:`<circle class="fruit" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="2"/>`}
+  let hv='';for(const [x,y] of HIVES){hv+=`<rect class="ink soft" x="${x-16}" y="${y-13}" width="32" height="26" rx="2"/><rect class="ink thin" x="${x-11}" y="${y-8}" width="22" height="16"/><path class="ink" d="M${x-16} ${y-4} v8"/>`}
+  s+=`<g class="zone" data-zone="hives" tabindex="0" role="button" aria-label="Hive field">
+    <rect class="hit" x="810" y="20" width="374" height="480" rx="12"/>
+    ${field}
+    <rect class="ink thin dash" x="840" y="74" width="330" height="320" rx="40"/>
+    ${hv}
+    ${T('lbl',996,452,lab('hives'),[260,1180])}
+  </g>`;
+  if(mode==='exp'){
+    const A=ANCHOR;
+    s+=`<path class="route" d="M${A.house} C 250 300, 300 392, ${A.garden} C 470 380, 560 300, ${A.flowers} C 790 205, 900 205, ${A.hives} C 1010 120, 760 0, 470 60 S 400 84, ${A.shed}"/>`;
+    for(const z of ZONES){const [x,y]=A[z.id];s+=`<g class="pin"><circle cx="${x}" cy="${y}" r="13"/>${T('',x,y+1,z.n,[520-y,x])}</g>`}
+  }
+  s+=`<g class="mbees" aria-hidden="true"></g>`;
+  svg.innerHTML=P?`<g transform="matrix(0 1 -1 0 520 0)">${s}</g>`:s;
+
+  const g=svg.querySelector('.mbees'), spots=[...HIVES.map(([x,y])=>({x:x-18,y})),{x:606,y:92},{x:742,y:248},{x:674,y:150},{x:606,y:404},{x:382,y:228},{x:742,y:404},{x:430,y:274}];
+  const mb=[];for(let i=0;i<9;i++){const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r','4.2');c.setAttribute('class','mbee');g.appendChild(c);
+    const a=spots[(i*3)%spots.length];mb.push({el:c,x:a.x,y:a.y,from:a,to:spots[(i*5+2)%spots.length],t:Math.random(),sp:.12+Math.random()*.12,ph:Math.random()*6})}
+  const place=b=>{b.el.setAttribute('cx',b.x.toFixed(1));b.el.setAttribute('cy',b.y.toFixed(1))};
+  if(reduce){mb.forEach(place);return}
+  let lt=0;(function tick(ts){if(svg._gen!==gen)return;const dt=Math.min(.05,(ts-lt)/1000||0);lt=ts;
+    if(svg.getBoundingClientRect().width>0){for(const b of mb){b.t+=dt*b.sp;if(b.t>=1){b.t=0;b.from=b.to;b.to=spots[Math.random()*spots.length|0]}
+      const e=b.t*b.t*(3-2*b.t), dx=b.to.x-b.from.x, dy=b.to.y-b.from.y, L=Math.hypot(dx,dy)||1, w=Math.sin(b.t*14+b.ph)*10*Math.sin(b.t*Math.PI);
+      b.x=b.from.x+dx*e-dy/L*w; b.y=b.from.y+dy*e+dx/L*w; place(b)}}
+    requestAnimationFrame(tick)})(0);
+}
+
+function wireMap({svg,panel,stops,data,subs,withExpNote}){
+  const order=ZONES.map(z=>z.id);
+  stops.innerHTML=order.map(id=>{const z=ZONES.find(q=>q.id===id), d=data.find(q=>q.id===id);
+    return `<button class="stop" data-zone="${id}"><span class="n">${z.n}</span><span>${subs?d.title:z.name}<small>${subs?z.name:z.sub}</small></span></button>`}).join('');
+  function select(id,scrollTo){
+    const d=data.find(z=>z.id===id)||data[0], z=ZONES.find(q=>q.id===d.id);
+    let html=d.html;
+    if(withExpNote) html+=`<div class="onexp"><p class="eyebrow">On the beekeeping experience</p><p>${z.exp}</p><button class="btn-ghost" data-go="exp">SEE THE EXPERIENCE &#9654;</button></div>`;
+    panel.innerHTML=html; panel.classList.remove('swap'); void panel.offsetWidth; panel.classList.add('swap');
+    svg.querySelectorAll('.zone').forEach(el=>el.classList.toggle('active',el.dataset.zone===d.id));
+    stops.querySelectorAll('.stop').forEach(b=>b.setAttribute('aria-current',b.dataset.zone===d.id?'true':'false'));
+    if(scrollTo&&innerWidth<820) panel.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});
+  }
+  stops.querySelectorAll('.stop').forEach(b=>b.addEventListener('click',()=>select(b.dataset.zone,false)));
+  svg.querySelectorAll('.zone').forEach(el=>{
+    el.addEventListener('click',()=>select(el.dataset.zone,true));
+    el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(el.dataset.zone,true)}});
+  });
+  select(order[0]);
+  return select;
+}
+
+
+// hover tip on the experience map
+const tip=$('#tip'), card=$('#expcard');
+function showTip(el){
+  if(isPort()){tip.hidden=true;return}
+  const d=EXP.find(q=>q.id===el.dataset.zone), z=ZONES.find(q=>q.id===el.dataset.zone);
+  tip.innerHTML=`<p class="eyebrow">Step ${z.n} &middot; ${z.name.replace('&','&amp;')}</p><b>${d.title}</b><p>${d.tip}</p>`;
+  const [ax,ay]=ANCHOR[z.id], svg=$('#map-exp'), sb=svg.getBoundingClientRect(), cb=card.getBoundingClientRect(), P=isPort();
+  const fx=P?(520-ay)/520:ax/1200, fy=P?ax/1200:ay/520;
+  let x=sb.left-cb.left+fx*sb.width, y=sb.top-cb.top+fy*sb.height-14;
+  const half=Math.min(150,(cb.width-24)/2); x=Math.max(half+12,Math.min(cb.width-half-12,x));
+  tip.hidden=false; const th=tip.offsetHeight; if(y-th-10<4) y=th+14;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function setupMaps(){
+  tip.hidden=true;
+  buildMap($('#map-home'),'home');
+  wireMap({svg:$('#map-home'),panel:$('#panel-home'),stops:$('#stops-home'),data:ZONES,withExpNote:true});
+  buildMap($('#map-exp'),'exp');
+  const selectExp=wireMap({svg:$('#map-exp'),panel:$('#panel-exp'),stops:$('#stops-exp'),data:EXP,subs:true});
+  $$('#map-exp .zone').forEach(el=>{
+    el.addEventListener('mouseenter',()=>{showTip(el);selectExp(el.dataset.zone,false)});
+    el.addEventListener('focus',()=>showTip(el));
+    el.addEventListener('mouseleave',()=>tip.hidden=true);
+    el.addEventListener('blur',()=>tip.hidden=true);
+    el.addEventListener('click',()=>showTip(el));
+  });
+}
+setupMaps();
+mqPort.addEventListener('change',setupMaps);
+$('#map-exp').closest('.mapscroll').addEventListener('scroll',()=>tip.hidden=true);
+
+/* ================= INVENTORY ================= */
+function jarSprite(w,h){
+  const rows=[];const inner=w-2, body=h-5;
+  rows.push('..'+'b'.repeat(w-4)+'..');rows.push('.'+'B'.repeat(w-2)+'.');rows.push('.'+'B'.repeat(w-2)+'.');rows.push('.'+'G'.repeat(w-2)+'.');
+  const l0=Math.round(body*.38), l1=Math.round(body*.72);
+  for(let j=0;j<body;j++){let s='G';
+    for(let i=0;i<inner;i++){
+      let ch='H';
+      if(j===0) ch=i===0?'w':'h';
+      else if(j>=l0&&j<=l1&&i>=1&&i<inner-1){ ch='l'; const k=j-l0; if((k===1||k===3)&&i>=2&&i<inner-2&&(i%3)!==1) ch='k'; if(k===2&&i>=3&&i<inner-3&&i%2) ch='x'; }
+      else if(i===0&&j<body*.6) ch='w';
+      else if(i===inner-1) ch='d';
+      else if(j>body-3) ch='d';
+      s+=ch;}
+    rows.push(s+'G');}
+  rows.push('.'+'G'.repeat(w-2)+'.');
+  return rows;
+}
+const JAR_PAL={b:'#A0702E',B:'#7A5222',G:C.ink,H:C.honey,h:C.honeyLt,w:'#FFF4D2',d:'#B87A12',l:C.milk3,k:C.ink,x:C.honey};
+const HAT=[
+ ".....hhhh.....",
+ "....hHHHHh....",
+ "...hHHHHHHh...",
+ "...hHhhhhHh...",
+ "hhhhhhhhhhhhhh",
+ ".dddddddddddd.",
+ ".mMmMmMmMmMmM.",
+ ".MmMmMmMmMmMm.",
+ ".mMmMmMmMmMmM.",
+ ".MmMmMmMmMmMm.",
+ "..mMmMmMmMmM..",
+ "..llllllllll..",
+];
+const HAT_PAL={h:'#E9D79B',H:'#D8BE6E',d:'#A88F45',m:'#4A5246',M:'#7C8578',l:C.milk3};
+const ITEMS=[
+ {key:'med',type:'Honey',name:'Medium Jar of Honey',price:'$13',unit:'CAD',stock:false,spr:jarSprite(12,15),pal:JAR_PAL,
+  quip:'Restores balance. +5 CALM, +3 SWEETNESS. Best used with warm toast and a slow morning.',
+  stats:[['SWEETNESS',4],['CALM',5],['SHAREABILITY',2]]},
+ {key:'lg',type:'Honey',name:'Large Jar of Honey',price:'$22',unit:'CAD',stock:false,spr:jarSprite(15,20),pal:JAR_PAL,
+  quip:'A full summer of sunshine in one jar. +10 STAMINA. Can be shared with your whole party.',
+  stats:[['SWEETNESS',4],['STAMINA',5],['SHAREABILITY',5]]},
+ {key:'exp',type:'Experience',name:'Beekeeping Experience',stock:true,spr:HAT,pal:HAT_PAL,
+  quip:'Grants the title APPRENTICE BEEKEEPER. +1 COURAGE. Side effects include talking about bees for days.',
+  stats:[['COURAGE',4],['WONDER',5],['STICKINESS',3]],
+  tiers:[{id:'child',label:'CHILD',price:'$45 CAD'},{id:'adult',label:'ADULT',price:'PRICE TBA'}]},
+];
+function drawItem(canvas,it){
+  const px=Math.floor(Math.min(canvas.width,canvas.height)*.8/Math.max(it.spr[0].length,it.spr.length));
+  const g=canvas.getContext('2d');g.clearRect(0,0,canvas.width,canvas.height);
+  const w=it.spr[0].length*px, h=it.spr.length*px;
+  g.fillStyle='rgba(38,48,34,.14)';g.fillRect(Math.round((canvas.width-w*.8)/2),Math.round((canvas.height+h)/2)+px,Math.round(w*.8),px);
+  sprite(g,it.spr,canvas.width/2,(canvas.height+h)/2,px,it.pal);
+}
+function mountInventory(root){
+  root.innerHTML=`
+   <div class="inv-screen" tabindex="0" aria-label="Product inventory. Use the left and right arrow keys to switch items.">
+     <div class="inv-head"><span>INVENTORY</span><span class="cnt">1/3</span></div>
+     <div class="inv-stage">
+       <button class="inv-arrow prev" aria-label="Previous item">&#9664;</button>
+       <canvas class="inv-art" width="240" height="240" aria-hidden="true"></canvas>
+       <button class="inv-arrow next" aria-label="Next item">&#9654;</button>
+     </div>
+     <div class="inv-slots">${ITEMS.map((it,i)=>`<button class="slot" aria-label="${it.name}" data-i="${i}"><canvas width="64" height="64"></canvas>${it.stock?'':'<span class="x">0</span>'}</button>`).join('')}</div>
+   </div>
+   <div class="inv-info" aria-live="polite"></div>`;
+  const art=root.querySelector('.inv-art'), info=root.querySelector('.inv-info');
+  root.querySelectorAll('.slot').forEach((b,i)=>drawItem(b.querySelector('canvas'),ITEMS[i]));
+  let cur=0, tier='child';
+  function render(){
+    const it=ITEMS[cur]; drawItem(art,it);
+    root.querySelector('.cnt').textContent=`${cur+1}/${ITEMS.length}`;
+    root.querySelectorAll('.slot').forEach((b,i)=>b.setAttribute('aria-pressed',i===cur?'true':'false'));
+    const stats=`<ul class="stats">${it.stats.map(([n,v])=>`<li><span>${n}</span><span class="bar">${[0,1,2,3,4].map(k=>`<i class="${k<v?'on':''}"></i>`).join('')}</span></li>`).join('')}</ul>`;
+    let price='', tiers='', btn='';
+    if(it.tiers){
+      const t=it.tiers.find(t=>t.id===tier);
+      price=`<p class="price">${t.price}</p>`;
+      tiers=`<div class="tiers" role="group" aria-label="Choose a tier">${it.tiers.map(t=>`<button class="tier" data-t="${t.id}" aria-pressed="${t.id===tier}">${t.label}<b>${t.price}</b></button>`).join('')}</div>`;
+      btn=`<button class="btn-solid book">BOOK ${t.label} &#9654;</button><button class="btn-ghost" data-go="exp">WHAT YOU'LL DO</button>`;
+    } else {
+      price=`<p class="price">${it.price}<small>${it.unit}</small></p>`;
+      btn=`<button class="btn-solid" disabled>OUT OF STOCK</button>`;
+    }
+    info.innerHTML=`<p class="eyebrow">Item ${cur+1} &middot; ${it.type}</p><h3>${it.name}</h3>${price}
+      <span class="status ${it.stock?'in':'out'}">${it.stock?'AVAILABLE':'SOLD OUT'}</span>
+      <p class="quip">${it.quip}</p>${stats}${tiers}<div class="buyrow">${btn}</div><p class="note"></p>`;
+    info.querySelectorAll('.tier').forEach(b=>b.addEventListener('click',()=>{tier=b.dataset.t;render()}));
+    const bk=info.querySelector('.book'); if(bk) bk.addEventListener('click',()=>{info.querySelector('.note').textContent='Online booking is coming soon. Contact the farm to reserve a spot.'});
+  }
+  const set=i=>{cur=(i+ITEMS.length)%ITEMS.length;render()};
+  root.querySelector('.prev').addEventListener('click',()=>set(cur-1));
+  root.querySelector('.next').addEventListener('click',()=>set(cur+1));
+  root.querySelectorAll('.slot').forEach(b=>b.addEventListener('click',()=>set(+b.dataset.i)));
+  root.querySelector('.inv-screen').addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){e.preventDefault();set(cur-1)}if(e.key==='ArrowRight'){e.preventDefault();set(cur+1)}});
+  render();
+  return {root,set};
+}
+inventories=$$('[data-inv]').map(mountInventory);
+})();
+</script>
+
+</body></html>
